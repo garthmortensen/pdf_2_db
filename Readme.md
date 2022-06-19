@@ -19,8 +19,9 @@ The goal of this code is to:
 
 Improvements:
 
-1. Use SQLAlchemy.
-2. Convert to classes and modularize.
-3. Depending on size of pdf content, maybe refactor so that pdfs are processed and inserted into db table one file at a time. If there were 100 gigs of pdf content to load, memory would be an issue.
-4. Add more functionality to the `string_cleaning` process.
-5. Rewrite for whatever use case.
+1. Create bash script to setup red hat, python, ocrmypdf
+2. Use SQLAlchemy.
+3. Convert to classes and modularize.
+4. Depending on size of pdf content, maybe refactor so that pdfs are processed and inserted into db table one file at a time. If there were 100 gigs of pdf content to load, memory would be an issue.
+5. Add more functionality to the `string_cleaning` process.
+6. Rewrite for whatever use case.
