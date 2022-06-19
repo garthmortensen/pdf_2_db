@@ -1,0 +1,17 @@
+# Guide to setting up OCRmyPDF on Red Hat
+
+# Update python
+# https://tecadmin.net/install-python-3-8-centos/
+python3  --version
+
+# install required packages
+sudo yum install ghostscript
+sudo yum install tesseract
+
+# create and activate virtual environment
+python -m venv venv
+source venv/bin/activate
+pip install ocrmypdf
+
+# OCR pdf, and create txt
+ocrmypdf --sidecar output.txt input_no_ocr.pdf output_ocr.pdf

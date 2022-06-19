@@ -1,22 +1,44 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Jun 19 06:33:08 2022
+
+@author: morte
+
+#####  #####  ######    #    # # #    # ###### #####
+#    # #    # #         ##  ## # ##   # #      #    #
+#    # #    # #####     # ## # # # #  # #####  #    #
+#####  #    # #         #    # # #  # # #      #####
+#      #    # #         #    # # #   ## #      #   #
+#      #####  #         #    # # #    # ###### #    #
+"""
+
 from pathlib import Path
 import os
 import pandas as pd
-
-from datetime import datetime  # timestamp column for archival purposes
+from datetime import datetime  # timestamp column for archiving
 
 # text cleaning
 import string  # for punctuation list
 import re  # regex for text cleaning
 
+import sqlite3
+import uuid
+
+# read relative paths
 dir_py = os.path.dirname(__file__)
 path_in = os.path.join(dir_py, "data", "in")
 path_out = os.path.join(dir_py, "data", "out")
 
-run_date = datetime.today().strftime('%Y-%m-%d')
-# run_date = "'" + run_date + "'"  # without ' it does the math of 2021 - 07
-
 # populate empty df using dict, which is refreshed in each loop
-columns = ["filepath", "filename", "content", "run_date"]
+columns = [
+           "id",
+           "load_date",
+           "filepath",
+           "filename",
+           "kb",
+           "content",
+           ]
+
 df = pd.DataFrame(columns=columns)
 one_row = dict.fromkeys(columns)
 
@@ -40,75 +62,84 @@ for filename in os.listdir(path_in):
     i += 1
     print(f"Reading {filename}, file #{i}")
 
+    kb = round(os.path.getsize(os.path.join(path_in, filename)) / 1024, 1)
+
     with open(os.path.join(path_in, filename), 'r', encoding='utf8') as f:
         content = f.read()  # readlines() for list
 
         content = string_cleaning(content)
 
-        # populate dict and append row to df
-        one_row["filepath"] = path_in
-        one_row["filename"] = filename
-        one_row["content"] = content
-        one_row["run_date"] = run_date
-        df = df.append(one_row, ignore_index=True)
+        # populate dict and append it to df as new_row
+        new_row["id"] = str(uuid.uuid4())
+        new_row["load_date"] = datetime.today().strftime('%Y-%m-%d')
+        new_row["filepath"] = path_in
+        new_row["filename"] = filename
+        new_row["kb"] = str(kb)  # otherwise wont insert
+        new_row["content"] = content
+        df = df.append(new_row, ignore_index=True)
 
 # %%
 
 # create db
-import sqlite3
 
 # https://www.sqlitetutorial.net/sqlite-python/creating-database/
-def create_connection(db_file):
-    """ create a database connection to a SQLite database """
-    conn = sqlite3.connect(db_file)  # :memory:
-    print(sqlite3.version)
-    conn.close()
-
+# Create a shared named in-memory database.
+# conn = sqlite3.connect("file:mem1?mode=memory&cache=shared", uri=True)  # for in memory db
 db_name = "pythonsqlite"
-create_connection(os.path.join(path_out, db_name + ".db"))
-
-# %%
-
-# create table
-from sqlalchemy import create_engine
-
-connection_string = "sqlite:///{db_name} + .db"
-engine = create_engine(connection_string, echo=True)
-conn = engine.connect()
-
-tablename = "all_content"
-query_create = \
-    f"""
-    create table if not exists {tablename} (
-    filepath        varchar(256)
-    , filename      varchar(256)
-    , content       varchar(256)
-    , run_date      varchar(256)
-    )
-    ;
-    """
-engine.execute(query_create)
-
-query_select = f"select * from {tablename}"
-df2 = pd.read_sql(query_select, con=engine)
-
-# %%
-
-# load into table
 conn = sqlite3.connect(os.path.join(path_out, db_name + ".db"))
+
 cursor = conn.cursor()
 
+# %%
 
-df_tuples = df.to_records(index=False)
-query_insert = \
-    f"""insert into {tablename} (filepath, filename, content, run_date)
-    values(?, ?, ?, ?)
+tablename_content = "pdf_content"
+tablename_keywords = "pdf_keywords"
+cursor.executescript(
+    f"""
+    drop table if exists {tablename_content};
+    create table if not exists {tablename_content} (
+      id            varchar(256)
+    , load_date     varchar(256)
+    , filepath      varchar(256)
+    , filename      varchar(256)
+    , kb            varchar(256)
+    , content       blob
+    );
     """
-cursor.executemany(query_insert, df_tuples)
-conn.commit()
-if(conn):
-  conn.close()
-  print("\nThe SQLite connection is closed.")
+    )
 
-# OperationalError: no such table: all_content
-# am i creating 2 different dbs???
+df_content = pd.read_sql(f"select * from {tablename_content}", con=conn)
+
+# %%
+
+# insert file content into table
+df_tuples = df.to_records(index=False)  # sqlite requires tuples
+query_insert = \
+    f"""insert into {tablename_content} ({', '.join(columns)})
+    values(?, ?, ?, ?, ?, ?)
+    """  # insert into tablexyz (field1, field2) values(?, ?)
+cursor.executemany(query_insert, df_tuples)
+
+df_content = pd.read_sql(f"select * from {tablename_content}", con=conn)
+
+# %%
+
+# quick keyword search in sql to complete exercise
+cursor.executescript(
+    f"""
+    drop table if exists {tablename_keywords};
+    create table if not exists {tablename_keywords} as
+    select
+          id
+        , case when content like ('% alaska %') then 1 else 0 end has_alaska
+        , case when content like ('% saturday %') then 1 else 0 end has_saturday
+        , case when content like ('% house %') then 1 else 0 end has_house
+    from {tablename_content}
+    ;
+    """
+    )
+
+df_keywords = pd.read_sql(f"select * from {tablename_keywords}", con=conn)
+
+conn.commit()
+conn.close()

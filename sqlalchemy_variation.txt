@@ -1,0 +1,22 @@
+# create table
+from sqlalchemy import create_engine
+
+connection_string = "sqlite:///{db_name} + .db"
+engine = create_engine(connection_string, echo=True)
+conn = engine.connect()
+
+tablename = "all_content"
+query_create = \
+    f"""
+    create table if not exists {tablename} (
+    filepath        varchar(256)
+    , filename      varchar(256)
+    , content       varchar(256)
+    , run_date      varchar(256)
+    )
+    ;
+    """
+engine.execute(query_create)
+
+query_select = f"select * from {tablename}"
+df2 = pd.read_sql(query_select, con=engine)
