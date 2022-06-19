@@ -131,9 +131,9 @@ cursor.executescript(
     create table if not exists {tablename_keywords} as
     select
           id
-        , case when content like ('% alaska %') then 1 else 0 end has_alaska
-        , case when content like ('% saturday %') then 1 else 0 end has_saturday
-        , case when content like ('% house %') then 1 else 0 end has_house
+        , case when content like ('% alaska %')     then 1 else 0 end has_alaska
+        , case when content like ('% saturday %')   then 1 else 0 end has_saturday
+        , case when content like ('% house %')      then 1 else 0 end has_house
     from {tablename_content}
     ;
     """
